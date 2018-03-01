@@ -1,5 +1,7 @@
 from typing import List, Tuple
 
+import heapq
+
 file_names = ["a_example", "b_should_be_easy", "c_no_hurry", "d_metropolis", "e_high_bonus"]
 
 
@@ -15,6 +17,7 @@ class Ride:
         self.y2 = y2
         self.start = start
         self.finish = finish
+        self.completed = False
 
     def time_to_complete(self):
         return distance(self.x1, self.y1, self.x2, self.y2)
@@ -177,6 +180,10 @@ def setup():
 
 def dist(x1, x2, y1, y2):
     return abs(x1 - x2) + abs(y1 - y2)
+def calc_score(ride, car, bonus, num_timesteps):
+    #note - this alg can cause wait for million seconds for best ride
+    if(ride.completed):
+        return (0,0)
 
 
 def calc_score(ride, car):
@@ -186,15 +193,28 @@ def calc_score(ride, car):
     wait_time = 0
     if (car.time + dist_to_start < ride.start):
         wait_time = ride.start - (car.time + dist_to_start)
+
+    if (car.time + wait_time + dist_to_start + ride_length > ride.finish):
+        return (0, 0)
+    if(car.time + wait_time + dist_to_start + ride_length > num_timesteps):
+        return (0,0)
+
+    score = ride_length
+    if (car.time+dist_to_start<= ride.start):
+        score = (score+ bonus)
     if (car.time + dist_to_start + ride_length > ride.finish):
         return (0, 0)
 
-    return (ride_length, (ride_length + dist_to_start + wait_time))
+    return ( score, (ride_length + dist_to_start + wait_time))
 
 
 # Each car adds the next best ride and win!
 def classic_solve(rides, num_columns, num_rows, num_vehicles, num_rides, bonus, num_timesteps):
     cars = [Car(0, 0, 0) for i in range(num_vehicles)]
+  #  cars_heap = []
+    cars = [Car(0,0,0) for i in range(num_vehicles)]
+ #   for car in cars:
+  #      heapq.heappush(cars_heap, (0,car))
     for turn in range(num_timesteps):
         for car in cars:
             curr_max = 0
@@ -206,17 +226,19 @@ def classic_solve(rides, num_columns, num_rows, num_vehicles, num_rides, bonus, 
                 ride = rides[i]
                 score = calc_score(ride, car)
                 if (score[0] > curr_max):
+                score = calc_score(ride, car, bonus, num_timesteps)
+                if(score[0] > curr_max):
                     curr_max_index = i
                     curr_max = score[0]
                     curr_total_time = score[1]
             if (curr_max_index == -1):
                 continue
-            ride = rides[i]
-            del rides[i]
+            ride = rides[curr_max_index]
             car.time += curr_total_time
-            car.add_ride(i)
+            car.add_ride(curr_max_index)
             car.x = ride.x2
             car.y = ride.y2
+            rides[curr_max_index].completed = True
 
     with open(output_file_name, mode="w") as file:
         for car in cars:
@@ -232,6 +254,7 @@ for i in range(len(file_names)):
     output_file_name = file_names[i]+".out"
     setup()
 """
+
 file_index = 3
 input_file_name = file_names[file_index] + ".in"
 output_file_name = file_names[file_index] + ".out"
