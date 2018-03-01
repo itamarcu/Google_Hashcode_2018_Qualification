@@ -58,7 +58,7 @@ def solve_each_trip(rides: List[Ride], num_columns, num_rows, num_vehicles, num_
     #             if ride_1
     """just continuously add first possible ride, until the end of time"""
     rides = list(enumerate(rides))
-    rides.sort(key=lambda tup: tup[1].start)
+    rides.sort(key=lambda tup: (tup[1].start, -tup[1].score() // 1000))
     satisfied_rides = set()
     score = 0
     bonus_count = 0
@@ -69,7 +69,7 @@ def solve_each_trip(rides: List[Ride], num_columns, num_rows, num_vehicles, num_
         step = 0
         rides_taken = []
         for ride_i, ride in rides:
-            if ride_i in satisfied_rides:  # TEMP TEMP TEMP
+            if ride_i in satisfied_rides:
                 continue
             if ride.finish <= step:
                 continue
@@ -162,11 +162,12 @@ def setup():
             rides.append(Ride(x1, y1, x2, y2, start, finish))
 
     print(f"solving: {input_file_name}")
+
     output, score = solve_each_trip(rides, num_columns, num_rows, num_vehicles, num_rides, bonus, num_timesteps)
     print(f"SCORE: {score}")
 
-    for tup in output:
-        print(tup)
+    # for tup in output:
+    #     print(tup)
 
     with open(output_file_name, mode="w") as file:
         for amount_of_rides, the_rides in output:
@@ -181,7 +182,30 @@ def dist(x1, x2, y1, y2):
 
 
 def calc_score(ride, car, bonus, num_timesteps):
-    # note - this alg can cause wait for million seconds for best ride
+    if ride.completed:
+        return 0, 0
+
+    ride_length = dist(ride.x1, ride.x2, ride.y1, ride.y2)
+    dist_to_start = dist(car.x, ride.x1, car.y, ride.y1)
+    wait_time = 0
+    if car.time + dist_to_start < ride.start:
+        wait_time = ride.start - (car.time + dist_to_start)
+
+    if car.time + wait_time + dist_to_start + ride_length > ride.finish:
+        return 0, 0
+    if car.time + wait_time + dist_to_start + ride_length > num_timesteps:
+        return 0, 0
+
+    score = ride_length
+    if car.time + dist_to_start <= ride.start:
+        score = (score + bonus) * 1.123908
+    if car.time + dist_to_start + ride_length > ride.finish:
+        return 0, 0
+
+    return score, (ride_length + dist_to_start + wait_time)
+
+
+def actual_calc_score(ride, car, bonus, num_timesteps):
     if ride.completed:
         return 0, 0
 
@@ -211,6 +235,7 @@ def classic_solve(rides, num_columns, num_rows, num_vehicles, num_rides, bonus, 
     cars = [Car(0, 0, 0) for _ in range(num_vehicles)]
     #   for car in cars:
     #      heapq.heappush(cars_heap, (0,car))
+    total_score = 0
     for turn in range(num_timesteps):
         for car in cars:
             curr_max = 0
@@ -221,8 +246,6 @@ def classic_solve(rides, num_columns, num_rows, num_vehicles, num_rides, bonus, 
             for i in range(len(rides)):
                 ride = rides[i]
                 score = calc_score(ride, car, bonus, num_timesteps)
-                if score[0] > curr_max:
-                    score = calc_score(ride, car, bonus, num_timesteps)
                 if score[0] > curr_max:
                     curr_max_index = i
                     curr_max = score[0]
@@ -251,7 +274,7 @@ for i in range(len(file_names)):
     setup()
 """
 
-file_index = 3
+file_index = 2
 input_file_name = file_names[file_index] + ".in"
 output_file_name = file_names[file_index] + ".out"
 setup()
